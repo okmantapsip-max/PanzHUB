@@ -131,19 +131,82 @@ game:GetService("UserInputService").JumpRequest:Connect(function()
     end
 end)
 
--- Remove Network Pause / Gameplay Pause
-TabOther:CreateButton({
-    Name = "Remove Network Pause",
-    Callback = function()
-        settings().Physics.AllowSleep = false
-        sethiddenproperty(game, "NetworkPauseEnabled", false)
-        Rayfield:Notify({
-            Title = "Network Pause",
-            Content = "Network pause telah di-nonaktifkan!",
-            Duration = 5
-        })
+-- Toggle: Remove Gameplay Paused UI
+local removePause = false
+
+TabOther:CreateToggle({
+    Name = "Hide Gameplay Paused UI",
+    CurrentValue = false,
+    Callback = function(val)
+        removePause = val
+        if val then
+            -- immediate try
+            pcall(function()
+                if sethiddenproperty then
+                    pcall(function() sethiddenproperty(game, "NetworkPauseEnabled", false) end)
+                end
+                -- try also hidden property on RobloxGui if available
+                local ok, rg = pcall(function() return game:GetService("CoreGui"):FindFirstChild("RobloxGui") end)
+                if ok and rg then
+                    pcall(function()
+                        for _, d in ipairs(rg:GetDescendants()) do
+                            if d:IsA("TextLabel") or d:IsA("TextButton") then
+                                if type(d.Text) == "string" and (d.Text:lower():find("gameplay paused") or d.Text:lower():find("game paused")) then
+                                    if d.Parent and d.Parent:IsA("GuiObject") then
+                                        d.Parent.Visible = false
+                                    else
+                                        d.Visible = false
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                end
+            end)
+        end
     end,
 })
+
+-- background cleaner loop (safeguarded with pcall)
+task.spawn(function()
+    while true do
+        if removePause then
+            pcall(function()
+                -- try disabling network pause flag (if available)
+                if sethiddenproperty then
+                    pcall(function() sethiddenproperty(game, "NetworkPauseEnabled", false) end)
+                end
+
+                local CG = game:GetService("CoreGui")
+                for _, gui in ipairs(CG:GetDescendants()) do
+                    -- hide frames/dialogs that contain "gameplay paused" text
+                    if (gui:IsA("TextLabel") or gui:IsA("TextButton")) and type(gui.Text) == "string" then
+                        local txt = gui.Text:lower()
+                        if txt:find("gameplay paused") or txt:find("game paused") or txt:find("gameplay has been paused") then
+                            pcall(function()
+                                if gui.Parent and gui.Parent:IsA("GuiObject") then
+                                    gui.Parent.Visible = false
+                                else
+                                    gui.Visible = false
+                                end
+                            end)
+                        end
+                    end
+
+                    -- also try to hide whole ScreenGuis that look like pause dialogs
+                    if gui:IsA("Frame") or gui:IsA("ImageLabel") then
+                        local name = tostring(gui.Name):lower()
+                        if name:find("pause") or name:find("paused") or name:find("modal") then
+                            pcall(function() gui.Visible = false end)
+                        end
+                    end
+                end
+            end)
+        end
+        task.wait(0.8)
+    end
+end)
+
 
 --------------------------------------------------
 -- NOTIFY LOAD
