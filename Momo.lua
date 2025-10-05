@@ -43,7 +43,7 @@ local function teleportTo(location)
 end
 
 local AutoTeleporting = false
-local DelayTime = 0.9
+local DelayTime = 0.1
 
 local function autoTeleportOnce()
     local plr = game.Players.LocalPlayer
